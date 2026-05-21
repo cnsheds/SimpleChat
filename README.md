@@ -37,6 +37,28 @@ DEFAULT_ADMIN_PASSWORD=yourpassword
 DEFAULT_ADMIN_NAME=管理员
 ```
 
+## GitHub Actions 镜像
+
+推送到 `main` / `master` 或推送 `v*` tag 后，会自动构建并推送 Docker 镜像到 GHCR：
+
+```text
+ghcr.io/<owner>/<repo>:latest
+ghcr.io/<owner>/<repo>:sha-<commit>
+ghcr.io/<owner>/<repo>:v1.0.0
+```
+
+拉取示例：
+
+```bash
+docker pull ghcr.io/<owner>/<repo>:latest
+```
+
+如仓库或 Package 为私有，需要先登录：
+
+```bash
+echo <github-token> | docker login ghcr.io -u <github-username> --password-stdin
+```
+
 ## 客服管理
 
 管理员登录客服端后，点击右上角的用户图标进入客服管理，可以添加、编辑、禁用、启用和删除客服账号。已有会话记录的客服账号不能硬删除，请使用禁用。

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { api } from '../api.js';
 
 export default function Login({ onLogin }) {
-  const [totpCode, setTotpCode] = useState('');
+  const inviteCode = new URLSearchParams(window.location.search).get('invite_code') || '';
+  const [inviteCodeInput, setInviteCodeInput] = useState(inviteCode);
   const [identifier, setIdentifier] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [error, setError] = useState('');
@@ -16,7 +17,7 @@ export default function Login({ onLogin }) {
       const result = await api('/api/auth/user-login', {
         method: 'POST',
         body: JSON.stringify({
-          totp_code: totpCode,
+          invite_code: inviteCodeInput,
           identifier,
           display_name: displayName || identifier
         })
@@ -43,10 +44,11 @@ export default function Login({ onLogin }) {
               className="mt-2 w-full rounded-md border border-slate-300 px-3 py-3 text-lg outline-none focus:border-cyan-600"
               inputMode="numeric"
               autoComplete="one-time-code"
-              value={totpCode}
-              onChange={(event) => setTotpCode(event.target.value)}
+              value={inviteCodeInput}
+              onChange={(event) => setInviteCodeInput(event.target.value)}
               required
             />
+            {inviteCode && <span className="mt-2 block text-xs text-cyan-700">已从邀请链接填入邀请码。</span>}
           </label>
           <label className="block">
             <span className="text-sm font-medium text-slate-700">手机号或昵称</span>

@@ -1,4 +1,4 @@
-import { LogOut, RefreshCw, Users } from 'lucide-react';
+import { Link, LogOut, RefreshCw, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, authHeaders } from '../api.js';
 import AgentManager from './AgentManager.jsx';
@@ -9,6 +9,7 @@ export default function Dashboard({ token, profile, socket, onLogout }) {
   const [selectedId, setSelectedId] = useState(null);
   const [status, setStatus] = useState('active');
   const [view, setView] = useState('sessions');
+  const [invite, setInvite] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -47,6 +48,19 @@ export default function Dashboard({ token, profile, socket, onLogout }) {
 
   const selected = sessions.find((item) => item.session_id === selectedId) || null;
 
+  async function generateInviteLink() {
+    setError('');
+    try {
+      const result = await api('/api/auth/invite-link', {
+        headers: authHeaders(token)
+      });
+      setInvite(result);
+      await navigator.clipboard?.writeText(result.url).catch(() => {});
+    } catch (err) {
+      setError(err.message);
+    }
+  }
+
   return (
     <main className="flex h-screen overflow-hidden flex-col bg-zinc-50 text-zinc-900">
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
@@ -57,6 +71,9 @@ export default function Dashboard({ token, profile, socket, onLogout }) {
         <div className="flex items-center gap-2">
           <button className="rounded-md border border-zinc-300 p-2 text-zinc-700" onClick={() => loadSessions(status)} title="刷新">
             <RefreshCw size={18} />
+          </button>
+          <button className="rounded-md border border-zinc-300 p-2 text-zinc-700" onClick={generateInviteLink} title="生成邀请链接">
+            <Link size={18} />
           </button>
           {profile?.is_admin && (
             <button
@@ -73,6 +90,16 @@ export default function Dashboard({ token, profile, socket, onLogout }) {
         </div>
       </header>
       {error && <div className="bg-red-50 px-4 py-2 text-sm text-red-700">{error}</div>}
+      {invite && (
+        <div className="flex items-center gap-3 border-b border-zinc-200 bg-teal-50 px-4 py-3 text-sm text-teal-900">
+          <span className="font-medium">邀请码：{invite.code}</span>
+          <span className="text-teal-700">有效至：{new Date(invite.expires_at).toLocaleString()}</span>
+          <input className="min-w-0 flex-1 rounded-md border border-teal-200 bg-white px-3 py-2 text-zinc-800" value={invite.url} readOnly />
+          <button className="rounded-md bg-teal-700 px-3 py-2 text-white" onClick={() => navigator.clipboard?.writeText(invite.url)}>
+            复制
+          </button>
+        </div>
+      )}
       {view === 'agents' && profile?.is_admin ? (
         <AgentManager token={token} currentAgentId={profile.agent_id} />
       ) : (

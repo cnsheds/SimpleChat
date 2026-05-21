@@ -17,11 +17,7 @@ npm run dev:agent
 - 客服端开发地址：`http://localhost:5174/agent/`
 - 后端地址：`http://localhost:3000`
 
-默认 `.env.example` 中的 TOTP secret 仅用于开发。查看当前邀请码：
-
-```bash
-node -e "import('otplib').then(({totp})=>{totp.options={step:7200,window:1,digits:6};console.log(totp.generate(process.env.TOTP_SECRET || 'JBSWY3DPEHPK3PXP'))})"
-```
+邀请码由客服工作台生成，8 位字母数字组合，有效期 2 小时，仅保存在服务端内存中。
 
 ## 生产构建
 
@@ -34,6 +30,8 @@ docker compose --env-file .env up -d --build
 首次启动时，如 `.env` 配置了以下变量，系统会在管理员不存在时自动创建默认管理员；如果账号已存在，重启不会重置密码。
 
 ```env
+SITE_URL=https://chat.example.com
+INVITE_TTL_MINUTES=120
 DEFAULT_ADMIN_USERNAME=admin
 DEFAULT_ADMIN_PASSWORD=yourpassword
 DEFAULT_ADMIN_NAME=管理员
@@ -67,7 +65,6 @@ services:
     restart: always
     environment:
       NODE_ENV: production
-      TOTP_SECRET: ${TOTP_SECRET}
       JWT_SECRET: ${JWT_SECRET}
       PORT: 3000
       MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
@@ -139,3 +136,20 @@ sudo systemctl reload nginx
 
 - 用户端：`https://chat.example.com/`
 - 客服端：`https://chat.example.com/agent/`
+
+## 邀请链接
+
+在 `.env` 中配置网站公开地址：
+
+```env
+SITE_URL=https://chat.example.com
+```
+
+客服登录后点击右上角链接按钮生成邀请链接。用户通过该链接打开后，邀请码会自动显示在登录页。
+
+邀请码为 8 位字母数字组合，有效期 2 小时，仅保存在服务端内存中。服务重启后，已生成的邀请码会失效。
+有效期可通过 `.env` 配置，单位为分钟：
+
+```env
+INVITE_TTL_MINUTES=120
+```

@@ -2,37 +2,41 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import { db, toIsoDate } from '../db/index.js';
 import { authenticateAgent } from '../middleware/auth.js';
-import { verifyTotp } from '../services/totp.js';
+import { createInviteCode, verifyInviteCode } from '../services/invite.js';
 import { createOpaqueToken, hashToken, signAgentToken } from '../services/token.js';
 import {
   checkAgentRateLimit,
-  checkTotpRateLimit,
+  checkInviteRateLimit,
   clearAgentFailure,
-  clearTotpFailure,
+  clearInviteFailure,
   recordAgentFailure,
-  recordTotpFailure
+  recordInviteFailure
 } from '../services/rateLimit.js';
 
 const router = express.Router();
 const fakeHash = bcrypt.hashSync('not-the-password', 12);
 
+function publicSiteUrl() {
+  return String(process.env.SITE_URL || '').trim().replace(/\/+$/, '');
+}
+
 router.post('/user-login', (req, res) => {
   const ip = req.ip;
-  const limited = checkTotpRateLimit(ip);
+  const limited = checkInviteRateLimit(ip);
   if (limited.blocked) {
     return res.status(429).json({ error: '尝试次数过多，请稍后再试', remaining: limited.remaining });
   }
 
-  const { totp_code, identifier, display_name } = req.body;
+  const { invite_code, identifier, display_name } = req.body;
   const cleanIdentifier = String(identifier || '').trim();
   if (!cleanIdentifier) return res.status(400).json({ error: '请输入手机号或昵称' });
 
-  if (!verifyTotp(totp_code)) {
-    recordTotpFailure(ip);
+  if (!verifyInviteCode(invite_code)) {
+    recordInviteFailure(ip);
     return res.status(401).json({ error: '验证码无效' });
   }
 
-  clearTotpFailure(ip);
+  clearInviteFailure(ip);
   const existing = db.prepare('SELECT * FROM users WHERE identifier = ?').get(cleanIdentifier);
   const name = String(display_name || cleanIdentifier).trim();
   let user = existing;
@@ -110,6 +114,16 @@ router.post('/agent-login', (req, res) => {
 router.post('/agent-logout', authenticateAgent, (req, res) => {
   db.prepare('UPDATE agents SET is_online = 0 WHERE id = ?').run(req.actor.id);
   return res.json({ success: true });
+});
+
+router.get('/invite-link', authenticateAgent, (req, res) => {
+  const siteUrl = publicSiteUrl();
+  if (!siteUrl) return res.status(500).json({ error: '未配置 SITE_URL' });
+
+  const invite = createInviteCode(req.actor.id);
+  const url = new URL(siteUrl);
+  url.searchParams.set('invite_code', invite.code);
+  return res.json({ code: invite.code, expires_at: invite.expires_at, url: url.toString() });
 });
 
 export default router;

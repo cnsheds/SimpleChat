@@ -1,4 +1,4 @@
-const totpFailures = new Map();
+const inviteFailures = new Map();
 const agentIpFailures = new Map();
 const agentNameFailures = new Map();
 
@@ -37,14 +37,14 @@ function recordFailure(store, key, options) {
   store.set(key, record);
 }
 
-export function checkTotpRateLimit(ip) {
-  resetExpiredWindow(totpFailures, ip, 5 * 60 * 1000);
-  return checkRecord(totpFailures, ip);
+export function checkInviteRateLimit(ip) {
+  resetExpiredWindow(inviteFailures, ip, 5 * 60 * 1000);
+  return checkRecord(inviteFailures, ip);
 }
 
-export function recordTotpFailure(ip) {
-  recordFailure(totpFailures, ip, {
-    label: 'TOTP',
+export function recordInviteFailure(ip) {
+  recordFailure(inviteFailures, ip, {
+    label: 'Invite',
     windowMs: 5 * 60 * 1000,
     softLimit: 5,
     hardLimit: 10,
@@ -53,8 +53,8 @@ export function recordTotpFailure(ip) {
   });
 }
 
-export function clearTotpFailure(ip) {
-  totpFailures.delete(ip);
+export function clearInviteFailure(ip) {
+  inviteFailures.delete(ip);
 }
 
 export function checkAgentRateLimit(ip, username) {

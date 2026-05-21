@@ -27,6 +27,30 @@ docker compose --env-file .env up -d --build
 
 用户端入口为 `/`，客服端入口为 `/agent/`。
 
+Docker Compose 示例：
+
+```yaml
+services:
+  app:
+    image: ghcr.io/cnsheds/simplechat:latest
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3000
+      SITE_URL: ${SITE_URL}
+      INVITE_TTL_MINUTES: ${INVITE_TTL_MINUTES:-120}
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+      DEFAULT_ADMIN_USERNAME: ${DEFAULT_ADMIN_USERNAME:-}
+      DEFAULT_ADMIN_PASSWORD: ${DEFAULT_ADMIN_PASSWORD:-}
+      DEFAULT_ADMIN_NAME: ${DEFAULT_ADMIN_NAME:-}
+    volumes:
+      - /opt/simple_chat/data:/app/server/data
+      - /opt/simple_chat/uploads:/app/server/uploads
+```
+
 首次启动时，如 `.env` 配置了以下变量，系统会在管理员不存在时自动创建默认管理员；如果账号已存在，重启不会重置密码。
 
 ```env
@@ -79,29 +103,6 @@ node src/app.js
 ## 主机 Nginx HTTPS 反代
 
 如需使用主机 Nginx 统一提供 HTTPS，建议 Docker 只暴露本机 `3000`：
-
-```yaml
-services:
-  app:
-    build: .
-    restart: always
-    environment:
-      NODE_ENV: production
-      JWT_SECRET: ${JWT_SECRET}
-      PORT: 3000
-      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
-    ports:
-      - "127.0.0.1:3000:3000"
-    volumes:
-      - ./server/data:/app/server/data
-      - ./server/uploads:/app/server/uploads
-```
-
-启动：
-
-```bash
-docker compose up -d --build app
-```
 
 主机 Nginx 示例，替换 `chat.example.com` 为实际域名：
 

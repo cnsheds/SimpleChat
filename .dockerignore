@@ -1,0 +1,11 @@
+node_modules
+client-user/dist
+client-agent/dist
+server/public
+server/data
+server/uploads/*
+!server/uploads/.gitkeep
+.git
+.github
+.env
+npm-debug.log*

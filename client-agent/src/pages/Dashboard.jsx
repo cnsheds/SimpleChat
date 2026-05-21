@@ -1,6 +1,7 @@
-import { Link, LogOut, RefreshCw, Users } from 'lucide-react';
+import { Bell, Link, LogOut, RefreshCw, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api, authHeaders } from '../api.js';
+import { getNotificationPermission, messagePreview, requestNotificationPermission, showIncomingNotification } from '../notifications.js';
 import AgentManager from './AgentManager.jsx';
 import ChatPanel from './Chat.jsx';
 
@@ -12,6 +13,7 @@ export default function Dashboard({ token, profile, socket, onLogout }) {
   const [invite, setInvite] = useState(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [notificationPermission, setNotificationPermission] = useState(getNotificationPermission);
 
   async function loadSessions(nextStatus = status) {
     setLoading(true);
@@ -34,17 +36,43 @@ export default function Dashboard({ token, profile, socket, onLogout }) {
   }, [status]);
 
   useEffect(() => {
-    if (!socket) return undefined;
-    const refresh = () => loadSessions(status);
-    socket.on('new_session', refresh);
-    socket.on('session_updated', refresh);
-    socket.on('session_deleted', refresh);
+    let cancelled = false;
+    requestNotificationPermission().then((permission) => {
+      if (!cancelled) setNotificationPermission(permission);
+    });
     return () => {
-      socket.off('new_session', refresh);
-      socket.off('session_updated', refresh);
-      socket.off('session_deleted', refresh);
+      cancelled = true;
     };
-  }, [socket, status]);
+  }, []);
+
+  useEffect(() => {
+    if (!socket) return undefined;
+    const onNewSession = (payload) => {
+      showIncomingNotification('新用户会话', {
+        body: payload?.user?.display_name || '有新的用户会话',
+        tag: `new-session-${payload?.session_id || 'latest'}`
+      });
+      loadSessions(status);
+    };
+    const onSessionUpdated = (payload) => {
+      if (payload?.last_message?.sender_type === 'user' && payload.session_id !== selectedId) {
+        showIncomingNotification('用户新消息', {
+          body: messagePreview(payload.last_message),
+          tag: `agent-session-${payload.session_id}`
+        });
+      }
+      loadSessions(status);
+    };
+    const onSessionDeleted = () => loadSessions(status);
+    socket.on('new_session', onNewSession);
+    socket.on('session_updated', onSessionUpdated);
+    socket.on('session_deleted', onSessionDeleted);
+    return () => {
+      socket.off('new_session', onNewSession);
+      socket.off('session_updated', onSessionUpdated);
+      socket.off('session_deleted', onSessionDeleted);
+    };
+  }, [socket, status, selectedId]);
 
   const selected = sessions.find((item) => item.session_id === selectedId) || null;
 
@@ -61,6 +89,17 @@ export default function Dashboard({ token, profile, socket, onLogout }) {
     }
   }
 
+  async function enableNotifications() {
+    setNotificationPermission(await requestNotificationPermission());
+  }
+
+  const notificationTitle =
+    notificationPermission === 'granted'
+      ? '浏览器通知已开启'
+      : notificationPermission === 'denied'
+        ? '浏览器通知已被拒绝'
+        : '开启浏览器通知';
+
   return (
     <main className="flex h-screen overflow-hidden flex-col bg-zinc-50 text-zinc-900">
       <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
@@ -74,6 +113,14 @@ export default function Dashboard({ token, profile, socket, onLogout }) {
           </button>
           <button className="rounded-md border border-zinc-300 p-2 text-zinc-700" onClick={generateInviteLink} title="生成邀请链接">
             <Link size={18} />
+          </button>
+          <button
+            className={`rounded-md border p-2 ${notificationPermission === 'granted' ? 'border-teal-700 bg-teal-50 text-teal-800' : 'border-zinc-300 text-zinc-700'} disabled:opacity-50`}
+            onClick={enableNotifications}
+            disabled={notificationPermission === 'unsupported'}
+            title={notificationTitle}
+          >
+            <Bell size={18} />
           </button>
           {profile?.is_admin && (
             <button

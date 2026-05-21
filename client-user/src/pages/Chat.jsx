@@ -1,6 +1,7 @@
-import { ArrowLeft, Image, Send } from 'lucide-react';
+import { ArrowLeft, Bell, Image, Send } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api, authHeaders, uploadImage } from '../api.js';
+import { getNotificationPermission, messagePreview, requestNotificationPermission, showIncomingNotification } from '../notifications.js';
 
 export default function Chat({ token, socket, sessionId, onBack }) {
   const [messages, setMessages] = useState([]);
@@ -8,6 +9,7 @@ export default function Chat({ token, socket, sessionId, onBack }) {
   const [error, setError] = useState('');
   const [closed, setClosed] = useState(false);
   const [typing, setTyping] = useState(false);
+  const [notificationPermission, setNotificationPermission] = useState(getNotificationPermission);
   const listRef = useRef(null);
 
   useEffect(() => {
@@ -19,13 +21,31 @@ export default function Chat({ token, socket, sessionId, onBack }) {
   }, [sessionId, token]);
 
   useEffect(() => {
+    let cancelled = false;
+    requestNotificationPermission().then((permission) => {
+      if (!cancelled) setNotificationPermission(permission);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
     if (!socket) return undefined;
     socket.emit('join_session', { session_id: sessionId, token }, (ack) => {
       if (!ack?.ok) setError(ack?.error || '无法加入会话');
     });
 
     const onMessage = (message) => {
-      if (message.session_id === sessionId) setMessages((old) => [...old, message]);
+      if (message.session_id === sessionId) {
+        setMessages((old) => [...old, message]);
+        if (message.sender_type === 'agent') {
+          showIncomingNotification('客服新消息', {
+            body: messagePreview(message),
+            tag: `user-session-${sessionId}`
+          });
+        }
+      }
     };
     const onTyping = ({ sender_type }) => {
       if (sender_type === 'agent') {
@@ -101,6 +121,17 @@ export default function Chat({ token, socket, sessionId, onBack }) {
     }
   }
 
+  async function enableNotifications() {
+    setNotificationPermission(await requestNotificationPermission());
+  }
+
+  const notificationTitle =
+    notificationPermission === 'granted'
+      ? '浏览器通知已开启'
+      : notificationPermission === 'denied'
+        ? '浏览器通知已被拒绝'
+        : '开启浏览器通知';
+
   return (
     <main className="flex h-screen flex-col bg-slate-50 text-slate-900">
       <header className="flex items-center gap-3 border-b border-slate-200 bg-white px-3 py-3">
@@ -111,6 +142,14 @@ export default function Chat({ token, socket, sessionId, onBack }) {
           <h1 className="font-semibold tracking-normal">客服会话</h1>
           <p className="text-xs text-slate-500">{closed ? '本次对话已结束' : typing ? '对方正在输入...' : '消息实时同步'}</p>
         </div>
+        <button
+          className={`ml-auto rounded-md border p-2 ${notificationPermission === 'granted' ? 'border-cyan-700 bg-cyan-50 text-cyan-800' : 'border-slate-300 text-slate-700'} disabled:opacity-50`}
+          onClick={enableNotifications}
+          disabled={notificationPermission === 'unsupported'}
+          title={notificationTitle}
+        >
+          <Bell size={18} />
+        </button>
       </header>
       {error && <div className="bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div>}
       <section ref={listRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-4">

@@ -1,6 +1,7 @@
 import { Image, Power, Send, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { api, authHeaders, uploadImage } from '../api.js';
+import { messagePreview, showIncomingNotification } from '../notifications.js';
 
 export default function ChatPanel({ token, socket, session, onChanged }) {
   const [messages, setMessages] = useState([]);
@@ -27,7 +28,15 @@ export default function ChatPanel({ token, socket, session, onChanged }) {
     });
 
     const onMessage = (message) => {
-      if (message.session_id === session.session_id) setMessages((old) => [...old, message]);
+      if (message.session_id === session.session_id) {
+        setMessages((old) => [...old, message]);
+        if (message.sender_type === 'user') {
+          showIncomingNotification(`${session.user.display_name} 发来消息`, {
+            body: messagePreview(message),
+            tag: `agent-session-${session.session_id}`
+          });
+        }
+      }
     };
     const onTyping = ({ sender_type }) => {
       if (sender_type === 'user') {

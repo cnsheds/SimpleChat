@@ -1,7 +1,7 @@
 import crypto from 'node:crypto';
+import { db } from '../db/index.js';
 
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-const invites = new Map();
 const cleanupMs = 10 * 60 * 1000;
 
 function inviteTtlMs() {
@@ -11,10 +11,7 @@ function inviteTtlMs() {
 }
 
 function cleanupExpiredInvites() {
-  const now = Date.now();
-  for (const [code, invite] of invites.entries()) {
-    if (invite.expiresAt <= now) invites.delete(code);
-  }
+  db.prepare('DELETE FROM invite_codes WHERE expires_at <= ?').run(new Date().toISOString());
 }
 
 function randomCode() {
@@ -29,10 +26,14 @@ export function createInviteCode(agentId) {
   cleanupExpiredInvites();
 
   let code = randomCode();
-  while (invites.has(code)) code = randomCode();
+  while (db.prepare('SELECT 1 FROM invite_codes WHERE code = ?').get(code)) code = randomCode();
 
   const expiresAt = Date.now() + inviteTtlMs();
-  invites.set(code, { agentId, expiresAt });
+  db.prepare('INSERT INTO invite_codes (code, agent_id, expires_at) VALUES (?, ?, ?)').run(
+    code,
+    agentId,
+    new Date(expiresAt).toISOString()
+  );
   return {
     code,
     expires_at: new Date(expiresAt).toISOString()
@@ -42,8 +43,8 @@ export function createInviteCode(agentId) {
 export function verifyInviteCode(code) {
   cleanupExpiredInvites();
   const cleanCode = String(code || '').trim();
-  const invite = invites.get(cleanCode);
-  return Boolean(invite && invite.expiresAt > Date.now());
+  const invite = db.prepare('SELECT expires_at FROM invite_codes WHERE code = ?').get(cleanCode);
+  return Boolean(invite && new Date(invite.expires_at).getTime() > Date.now());
 }
 
 setInterval(cleanupExpiredInvites, cleanupMs).unref();

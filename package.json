@@ -1,0 +1,17 @@
+{
+  "name": "simplechat",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "server",
+    "client-user",
+    "client-agent"
+  ],
+  "scripts": {
+    "dev:server": "npm --workspace server run dev",
+    "dev:user": "npm --workspace client-user run dev",
+    "dev:agent": "npm --workspace client-agent run dev",
+    "build": "npm --workspace client-user run build && npm --workspace client-agent run build",
+    "start": "npm --workspace server run start"
+  }
+}

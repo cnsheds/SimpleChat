@@ -23,6 +23,7 @@ COPY --from=deps /app/node_modules node_modules
 COPY server server
 COPY --from=build /app/client-user/dist server/public/user
 COPY --from=build /app/client-agent/dist server/public/agent
+RUN npm prune --omit=dev --workspaces
 WORKDIR /app/server
 EXPOSE 3000
 CMD ["node", "scripts/start.js"]

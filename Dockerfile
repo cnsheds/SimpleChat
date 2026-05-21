@@ -22,4 +22,4 @@ COPY --from=build /app/client-user/dist server/public/user
 COPY --from=build /app/client-agent/dist server/public/agent
 WORKDIR /app/server
 EXPOSE 3000
-CMD ["node", "src/app.js"]
+CMD ["node", "scripts/start.js"]

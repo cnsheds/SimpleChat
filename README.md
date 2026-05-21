@@ -27,10 +27,17 @@ node -e "import('otplib').then(({totp})=>{totp.options={step:7200,window:1,digit
 
 ```bash
 docker compose --env-file .env up -d --build
-docker compose exec app node scripts/create-agent.js --username admin --password yourpassword --name "客服小王"
 ```
 
 用户端入口为 `/`，客服端入口为 `/agent/`。
+
+首次启动时，如 `.env` 配置了以下变量，系统会在管理员不存在时自动创建默认管理员；如果账号已存在，重启不会重置密码。
+
+```env
+DEFAULT_ADMIN_USERNAME=admin
+DEFAULT_ADMIN_PASSWORD=yourpassword
+DEFAULT_ADMIN_NAME=管理员
+```
 
 ## 客服管理
 
@@ -41,3 +48,94 @@ docker compose exec app node scripts/create-agent.js --username admin --password
 ```bash
 node server/scripts/create-agent.js --username admin --password admin123 --name "管理员" --admin true
 ```
+
+Docker 容器启动时会自动执行：
+
+```bash
+node scripts/ensure-admin.js
+node src/app.js
+```
+
+## 主机 Nginx HTTPS 反代
+
+如需使用主机 Nginx 统一提供 HTTPS，建议 Docker 只暴露本机 `3000`：
+
+```yaml
+services:
+  app:
+    build: .
+    restart: always
+    environment:
+      NODE_ENV: production
+      TOTP_SECRET: ${TOTP_SECRET}
+      JWT_SECRET: ${JWT_SECRET}
+      PORT: 3000
+      MAX_FILE_SIZE: ${MAX_FILE_SIZE:-10485760}
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - ./server/data:/app/server/data
+      - ./server/uploads:/app/server/uploads
+```
+
+启动：
+
+```bash
+docker compose up -d --build app
+```
+
+主机 Nginx 示例，替换 `chat.example.com` 为实际域名：
+
+```nginx
+server {
+    listen 80;
+    server_name chat.example.com;
+
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl http2;
+    server_name chat.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/chat.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/chat.example.com/privkey.pem;
+
+    client_max_body_size 10m;
+
+    location /socket.io/ {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_read_timeout 300s;
+        proxy_send_timeout 300s;
+    }
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }
+}
+```
+
+启用配置后检查并重载：
+
+```bash
+sudo nginx -t
+sudo systemctl reload nginx
+```
+
+访问地址：
+
+- 用户端：`https://chat.example.com/`
+- 客服端：`https://chat.example.com/agent/`

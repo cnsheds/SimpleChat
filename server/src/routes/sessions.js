@@ -8,6 +8,7 @@ import {
   createOrGetSession,
   deleteSessionCompletely,
   findSession,
+  listAvailableAgents,
   listAgentSessions,
   listOnlineAgents
 } from '../services/session.js';
@@ -18,10 +19,15 @@ router.get('/agents/online', (_req, res) => {
   return res.json(listOnlineAgents());
 });
 
+router.get('/agents', (_req, res) => {
+  return res.json(listAvailableAgents());
+});
+
 router.post('/sessions', authenticateUser, (req, res) => {
   const agentId = Number(req.body.agent_id);
-  const agent = db.prepare('SELECT id, display_name, is_online FROM agents WHERE id = ?').get(agentId);
+  const agent = db.prepare('SELECT id, display_name, is_online, is_disabled FROM agents WHERE id = ?').get(agentId);
   if (!agent) return res.status(404).json({ error: '客服不存在' });
+  if (agent.is_disabled) return res.status(403).json({ error: '该客服暂不可用' });
 
   db.prepare("UPDATE users SET last_seen_at = datetime('now'), last_ip = ? WHERE id = ?").run(req.ip, req.actor.id);
   const session = createOrGetSession(req.actor.id, agentId);

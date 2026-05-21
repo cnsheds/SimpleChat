@@ -8,7 +8,7 @@ export default function AgentList({ token, user, onChat, onLogout }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    api('/api/agents/online')
+    api('/api/agents')
       .then(setAgents)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false));
@@ -46,7 +46,7 @@ export default function AgentList({ token, user, onChat, onLogout }) {
         {error && <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
         {!loading && agents.length === 0 && (
           <div className="rounded-lg border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500">
-            当前没有在线客服，请稍后再试。
+            当前没有可用客服，请稍后再试。
           </div>
         )}
         <div className="grid gap-3">
@@ -61,7 +61,9 @@ export default function AgentList({ token, user, onChat, onLogout }) {
               </div>
               <div className="min-w-0 flex-1">
                 <div className="font-medium">{agent.display_name}</div>
-                <div className="text-sm text-emerald-600">在线</div>
+                <div className={`text-sm ${agent.is_online ? 'text-emerald-600' : 'text-slate-500'}`}>
+                  {agent.is_online ? '在线' : '离线，可留言'}
+                </div>
               </div>
             </button>
           ))}

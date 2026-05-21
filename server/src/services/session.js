@@ -4,15 +4,23 @@ import { db } from '../db/index.js';
 
 const uploadRoot = path.resolve(process.cwd(), 'uploads');
 
-export function listOnlineAgents() {
+export function listAvailableAgents() {
   return db
     .prepare(
       `SELECT id AS agent_id, display_name, avatar_url, is_online
        FROM agents
-       WHERE is_online = 1 AND is_disabled = 0
-       ORDER BY display_name`
+       WHERE is_disabled = 0
+       ORDER BY is_online DESC, display_name`
     )
-    .all();
+    .all()
+    .map((agent) => ({
+      ...agent,
+      is_online: Boolean(agent.is_online)
+    }));
+}
+
+export function listOnlineAgents() {
+  return listAvailableAgents().filter((agent) => agent.is_online);
 }
 
 export function findSession(sessionId) {
